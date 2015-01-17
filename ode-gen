@@ -1,0 +1,15 @@
+#!/bin/sh
+
+### Laucher script for ode-gen.jar ###
+
+# Find the project directory and command name.
+dir=$(dirname $0)
+cmd=$(basename $0)
+
+# Make the JAR if it isn't up-to-date.
+[ -n "$(which make)" ] && \
+    make -C "${dir}/src" "../lib/${cmd}.jar" 1>&2 \
+    || exit 1
+
+# Run the JAR.
+scala "${dir}/lib/${cmd}.jar" "$@"
