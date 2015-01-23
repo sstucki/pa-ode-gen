@@ -10,9 +10,9 @@ preferential attachment networks.
 How to get started
 ------------------
 
- 1. Odds is written in Scala, which runs on the JVM.  So for starters,
-    you'll need an up-to-date [JRE/JDK](http://openjdk.java.net/).  If
-    you're on a Debian/Ubuntu system, this should do the trick:
+ 1. *pa-ode-gen* is written in Scala, which runs on the JVM.  So for
+    starters, you'll need an up-to-date [JRE/JDK](http://openjdk.java.net/).
+    If you're on a Debian/Ubuntu system, this should do the trick:
 
         $ sudo apt-get install openjdk-7-jre
 
@@ -22,8 +22,8 @@ How to get started
 
         $ git clone https://github.com/sstucki/pa-ode-gen.git
 
- 4. Run `./ode-gen -h` to get basic instructions on how to run the
-    tool.
+ 4. Run `./ode-gen -h` to build the ODE generator and get basic
+    instructions on how to run it.
 
 
 How to run it
@@ -31,7 +31,7 @@ How to run it
 
 *pa-ode-gen* has various output formatting options so one can
  1. generate code to solve the ODEs in
-    [Matlab](http://ch.mathworks.com/products/matlab/) or
+    [Matlab](http://www.mathworks.com/products/matlab/) or
     [GNU/Octave](https://www.gnu.org/software/octave/),
  2. generate pretty pictures of various graph motifs using
     [Graphviz](http://www.graphviz.org/),
