@@ -21,16 +21,20 @@ abstract class Rule {
  */
 
 /**
- * Rule 0: A => A <- B
+ * Rule 0: A => A <- B <-/->
  *
  * In words: connect a new node to an arbitrary existing node).
+ *
+ * Remark: the bidirectional mark on B ensures that the rule is
+ * reversible (i.e. the mark excludes underivable RHS gluings)
  */
 object Rule0 extends Rule {
 
   import Digraph._
 
   val lhs = node
-  val rhs = Digraph(Array(NodeInfo(Set(), false), NodeInfo(Set(0), false)))
+  val rhs = Digraph(Array(
+    NodeInfo(Set(), false, false), NodeInfo(Set(0), true, true)))
   val rate = Var("k", 0)
 
   def apply(g: Digraph): Iterable[(Digraph, Int)] = {
@@ -45,13 +49,11 @@ object Rule0 extends Rule {
     //
     // First compute all the gluings of the RHS and 'g' then apply the
     // "reversed" rule (removing the image of the A <- B edge) to all
-    // the gluings unless this would cause a side-effect (i.e. lead to
-    // the deletion of "dangling" edges), in which case the gluing in
-    // question is not derivable and must not be considered.
-    val rhsGs = for {
-      (h, i) <- rhs glue g
-      if (h.succs(1).size == 1) && (h.preds(1).size == 0)
-    } yield (h - 1, i)
+    // the gluings.  Note that side-effects (i.e. the deletion of
+    // "dangling" edges), are excluded by the mark on the B node so
+    // that we don't have to explicitly exclude underivable RHS
+    // gluings.
+    val rhsGs = for ((h, i) <- rhs glue g) yield (h - 1, i)
 
     // Quotient the result to eliminate duplicates and irrelevant
     // gluings.
@@ -62,18 +64,23 @@ object Rule0 extends Rule {
 }
 
 /**
- * Rule 1: A -> B => A -> B <- C
+ * Rule 1: A -> B => A -> B <- C <-/->
  *
  * In words: connect a new node to an (arbitrary) existing node with
  * at least one predecessor.
+ *
+ * Remark: the bidirectional mark on C ensures that the rule is
+ * reversible (i.e. the mark excludes underivable RHS gluings)
  */
 object Rule1 extends Rule {
 
   import Digraph._
 
-  val lhs = Digraph(Array(NodeInfo(Set(), false), NodeInfo(Set(0), false)))
+  val lhs = Digraph(Array(
+    NodeInfo(Set(), false, false), NodeInfo(Set(0), false, false)))
   val rhs = Digraph(Array(
-    NodeInfo(Set(), false), NodeInfo(Set(0), false), NodeInfo(Set(0), false)))
+    NodeInfo(Set(), false, false), NodeInfo(Set(0), false, false),
+    NodeInfo(Set(0), true, true)))
   val rate = Var("k", 1)
 
   def apply(g: Digraph): Iterable[(Digraph, Int)] = {
@@ -88,13 +95,11 @@ object Rule1 extends Rule {
     //
     // First compute all the gluings of the RHS and 'g' then apply the
     // "reversed" rule (removing the image of the B <- C edge) to all
-    // the gluings unless this would cause a side-effect (i.e. lead to
-    // the deletion of "dangling" edges), in which case the gluing is
-    // not derivable and must not be considered.
-    val rhsGs = for {
-      (h, i) <- rhs glue g
-      if (h.succs(2).size == 1) && (h.preds(2).size == 0)
-    } yield (h - 2, i)
+    // the gluings. Note that side-effects (i.e. the deletion of
+    // "dangling" edges), are excluded by the mark on the C node so
+    // that we don't have to explicitly exclude underivable RHS
+    // gluings.
+    val rhsGs = for ((h, i) <- rhs glue g) yield (h - 2, i)
 
     // Quotient the result to eliminate duplicates and irrelevant
     // gluings.

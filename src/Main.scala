@@ -146,8 +146,10 @@ object Main {
     assert(unit  !~ nStar, "unit ~ nStar")
     assert(nStar !~ empty, "nStar ~ empty")
     assert(nStar !~ unit,  "nStar ~ unit")
-    val a = Digraph(Array(NodeInfo(Set(), false), NodeInfo(Set(), false)))
-    val b = Digraph(Array(NodeInfo(Set(), false), NodeInfo(Set(), true)))
+    val a = Digraph(Array(
+      NodeInfo(Set(), false, false), NodeInfo(Set(), false, false)))
+    val b = Digraph(Array(
+      NodeInfo(Set(), false, false), NodeInfo(Set(), true, false)))
     assert(a !~ b, a + " ~ " + b)
     assert(b !~ a, b + " ~ " + a)
 
