@@ -53,6 +53,15 @@ case class Digraph(val nodes: Array[Digraph.NodeInfo]) {
     Digraph(uNodes)
   }
 
+  /** Add a single node to this graph. */
+  def +(n: NodeInfo): Digraph = {
+    val k = this.numNodes
+    val uNodes = new Array[NodeInfo](k + 1)
+    for (i <- this.nodeRange) { uNodes(i) = this.nodes(i) }
+    uNodes(k) = n
+    Digraph(uNodes)
+  }
+
   /** Check whether this graph has cycles. */
   def hasCycles: Boolean = {
 
@@ -337,6 +346,9 @@ object Digraph {
 
   /** The one-node graph (no edges). */
   val node = Digraph(Array(NodeInfo(Set(), false, false)))
+
+  /** The fully marked one-node graph (no edges). */
+  val mNode = Digraph(Array(NodeInfo(Set(), true, true)))
 
   /** The two-node, one-edge graph. */
   val edge = Digraph(Array(

@@ -23,7 +23,7 @@ abstract class Rule {
 /**
  * Rule 0: A => A <- B <-/->
  *
- * In words: connect a new node to an arbitrary existing node).
+ * In words: connect a new node to an arbitrary existing node.
  *
  * Remark: the bidirectional mark on B ensures that the rule is
  * reversible (i.e. the mark excludes underivable RHS gluings)
@@ -61,6 +61,46 @@ object Rule0 extends Rule {
   }
 
   override def toString = "r0"
+}
+
+/**
+ * Rule 0': A <- B <-/-> => A
+ *
+ * In words: remove a node with a single (outgoing) edge.
+ *
+ * Remark: this is the rule 0 reversed.
+ */
+object Rule0Bis extends Rule {
+
+  import Digraph._
+
+  val lhs = Digraph(Array(
+    NodeInfo(Set(), false, false), NodeInfo(Set(0), true, true)))
+  val rhs = node
+  val rate = Var("k'", 0)
+
+  def apply(g: Digraph): Iterable[(Digraph, Int)] = {
+
+    // LHS gluings:
+    //
+    // Simply compute all the gluings of the LHS and 'g' and multiply
+    // their multiplicity by -1.
+    val lhsGs = for ((h, i) <- lhs glue g) yield (h, -i)
+
+    // RHS gluings:
+    //
+    // First compute all the gluings of the RHS and 'g' then apply the
+    // "reversed" rule (adding a marked node B and an A <- B edge) to
+    // all the gluings.
+    val rhsGs = for ((h, i) <- rhs glue g) yield
+      (h + NodeInfo(Set(0), true, true), i)
+
+    // Quotient the result to eliminate duplicates and irrelevant
+    // gluings.
+    quotientByIso(lhsGs ++ rhsGs)
+  }
+
+  override def toString = "r0'"
 }
 
 /**
