@@ -1,7 +1,7 @@
 import scala.collection.mutable.{ ArrayBuffer }
 import java.io.{ BufferedReader, FileReader, PrintWriter }
 
-case class TooManyOdes(numOdes: Int) extends Exception
+case class TooManyOdes(numOdes: Seq[(Var, Expr, Digraph)]) extends Exception
 
 object Main {
 
@@ -33,7 +33,6 @@ object Main {
         var rhs: Expr = Const(0)
         for (r <- rules) {
           val (gs, sum) = processRule(r, g, vs)
-          if (vs.size > thsld) throw TooManyOdes(vs.size)
           rhs = Sum(sum, rhs)
           newGs ++= gs
         }
@@ -42,6 +41,7 @@ object Main {
       i += 1
       toCheck = newGs
       println(" done.")
+      if (vs.size > thsld) throw TooManyOdes(odes)
     }
     assert(vs.size == odes.length)
     odes
@@ -64,19 +64,22 @@ object Main {
     Console.err.println("  -d --dot     Produce DOT output (graphs only).")
     Console.err.println("  -o --octave  Produce GNU/Octave output." )
     Console.err.println("  -t --tex     Produce TeX output.")
+    Console.err.println("  -m --max N   Generate at most N ODEs.")
     Console.err.println("  -h --help    Print these instructions.")
     sys.exit(exitCode)
   }
 
   /** Parse command line arguments. */
   def parseArgs(args: Array[String]) = {
-
     var i = 0;
     var outputType = -1
+    var maxOdes = 3000
     while ((args.size > i) && (args(i)(0) == '-')) args(i) match {
       case "-d" | "--dot"    => outputType = DotOutput   ; i += 1
       case "-o" | "--octave" => outputType = OctaveOutput; i += 1
       case "-t" | "--tex"    => outputType = TexOutput   ; i += 1
+      case "-m" | "--max"    if args.size > (i + 1) =>
+        maxOdes = args(i + 1).toInt; i += 2
       case "-h" | "--help"   => printUsage(0)
       case _                 =>
         Console.err.println(cmd + ": invalid option: " + args(i))
@@ -120,14 +123,14 @@ object Main {
       else if (outFilename endsWith ".tex'") TexOutput
       else TextOutput
 
-    (n, ks, outputType, out, outFilename)
+    (n, ks, outputType, out, outFilename, maxOdes)
   }
 
   // *** Main method ***
   def main(args: Array[String]) {
 
     // Parse the command line arguments
-    val (n, ks, outputType, out, outFilename) = parseArgs(args)
+    val (n, ks, outputType, out, outFilename, maxOdes) = parseArgs(args)
 
     // Build a star with n spokes. */
     val nStar = star(n)
@@ -203,93 +206,95 @@ object Main {
     Console.withOut(Console.err) {
 
       // Generate the ODEs
-      try {
+      val odes = try {
         println("Generating ODEs for moments " + ks.mkString(", ") +
           " of the " + n + "-star observable...")
-        val odes = computeOdes(vs, rules, 3000)
+        val odes = computeOdes(vs, rules, maxOdes)
         println("done.")
-
-        // Produce GNU/Octave output
-        outputType match {
-          case DotOutput =>
-            for ((_, _, g) <- odes) out.println(g.toDot)
-
-          case OctaveOutput =>
-            print("Computing initial conditions...")
-            val x0 = for ((_, _, g) <- odes) yield {
-              if (g.nodes.size == 1 && g.edges.size == 0) 1.0 else 0.0
-            }
-            println("done.")
-
-            out.println("# ODEs for moments " + ks.mkString(", ") +
-              " of the " + n + "-star observable.")
-            out.println("#")
-            out.println("# Associated graph observables:")
-            for ((v, _, g) <- odes)
-              out.println("#   " + v.toOctave + " = #" + g)
-            out.println("function xdot = f(x, t)")
-            out.println("  global k")
-            for ((v, rhs, _) <- odes)
-              out.println("  xdot(" + (v.index + 1) + ") = " +
-                rhs.toOctave + ";")
-            out.println("endfunction")
-            out.println
-            out.println("# Initial conditions.")
-            out.println("x_0 = " + x0.mkString("[ ", ", ", " ]") + ";")
-            out.println
-            out.println("# To solve the ODEs, load this file, then run " +
-              "the following:")
-            val rates = for (r <- rules) yield "<" + r.rate + ">"
-            out.println("# global k = [ " + rates.mkString(", ") +
-              " ];     # Rule rates.")
-            out.println("# t = linspace(<t_0>, <t_end>, <#steps>);" +
-              "   # Output times.")
-            out.println("# x = lsode(\"f\", x_0, t);   # Solve ODEs.")
-            for ((k, rhs) <- momentRhsTerms) {
-              val terms =
-                for (Prod(Const(c), Var(n, i)) <- rhs)
-                yield c + " * " + n + "(:, " + (i + 1) + ")"
-              out.println("# moment_" + k + " = " + terms.mkString(" + ") +
-                ";  # Compute moment " + k + ".")
-            }
-            out.println("# plot(" + ks.map("t, moment_" + _).mkString(",") +
-              ");  # Plot moments.");
-
-          case TexOutput =>
-            out.println("\\documentclass{article}")
-            out.println("\\usepackage{amsmath}")
-            out.println("\\begin{document}")
-            out.println("\\allowdisplaybreaks")
-            out.println("  \\begin{align*}")
-            for ((k, rhs) <- momentRhsTerms) {
-              val lhs = if (k == 1) "    x" else "    x^" + k
-              out.println(
-                lhs + " &= " + rhs.map(_.normalize.toTex).mkString(" + ") +
-                  "\\\\")
-            }
-            for ((v, rhs, _) <- odes)
-              out.println(
-                "    \\tfrac{d}{dt}" + v.toTex + " &= " + rhs.toTex + "\\\\")
-            out.println("  \\end{align*}")
-            out.println("\\end{document}")
-
-          case _ =>
-            for ((k, rhs) <- momentRhsTerms) {
-              out.println("x^" + k + " = " + rhs.mkString(" + "))
-            }
-            for ((v, rhs, _) <- odes) { out.println("d" + v + "/dt = " + rhs) }
-            out.println("where")
-            for ((v, _, g) <- odes) { out.println("  " + v + " = #" + g) }
-        }
-        out.flush
-        if (args.size > 2) out.close
-        println("Wrote " + odes.size + " ODEs to " + outFilename + ".")
-
+        odes
       } catch {
         case TooManyOdes(odes) =>
-          println("/nToo many ODEs: threshold exceeded at " + odes + " ODEs.")
-          println("Aborting...")
+          println("WARNING: Too many ODEs: threshold exceeded at " +
+            odes.size + " ODEs.")
+          println("Writing partial result to " + outFilename + "...")
+          odes
       }
+
+      // Produce GNU/Octave output
+      outputType match {
+        case DotOutput =>
+          for ((_, _, g) <- odes) out.println(g.toDot)
+
+        case OctaveOutput =>
+          print("Computing initial conditions...")
+          val x0 = for ((_, _, g) <- odes) yield {
+            if (g.nodes.size == 1 && g.edges.size == 0) 1.0 else 0.0
+          }
+          println("done.")
+
+          out.println("# ODEs for moments " + ks.mkString(", ") +
+            " of the " + n + "-star observable.")
+          out.println("#")
+          out.println("# Associated graph observables:")
+          for ((v, _, g) <- odes)
+            out.println("#   " + v.toOctave + " = #" + g)
+          out.println("function xdot = f(x, t)")
+          out.println("  global k")
+          for ((v, rhs, _) <- odes)
+            out.println("  xdot(" + (v.index + 1) + ") = " +
+              rhs.toOctave + ";")
+          out.println("endfunction")
+          out.println
+          out.println("# Initial conditions.")
+          out.println("x_0 = " + x0.mkString("[ ", ", ", " ]") + ";")
+          out.println
+          out.println("# To solve the ODEs, load this file, then run " +
+            "the following:")
+          val rates = for (r <- rules) yield "<" + r.rate + ">"
+          out.println("# global k = [ " + rates.mkString(", ") +
+            " ];     # Rule rates.")
+          out.println("# t = linspace(<t_0>, <t_end>, <#steps>);" +
+            "   # Output times.")
+          out.println("# x = lsode(\"f\", x_0, t);   # Solve ODEs.")
+          for ((k, rhs) <- momentRhsTerms) {
+            val terms =
+              for (Prod(Const(c), Var(n, i)) <- rhs)
+              yield c + " * " + n + "(:, " + (i + 1) + ")"
+            out.println("# moment_" + k + " = " + terms.mkString(" + ") +
+              ";  # Compute moment " + k + ".")
+          }
+          out.println("# plot(" + ks.map("t, moment_" + _).mkString(",") +
+            ");  # Plot moments.");
+
+        case TexOutput =>
+          out.println("\\documentclass{article}")
+          out.println("\\usepackage{amsmath}")
+          out.println("\\begin{document}")
+          out.println("\\allowdisplaybreaks")
+          out.println("  \\begin{align*}")
+          for ((k, rhs) <- momentRhsTerms) {
+            val lhs = if (k == 1) "    x" else "    x^" + k
+            out.println(
+              lhs + " &= " + rhs.map(_.normalize.toTex).mkString(" + ") +
+                "\\\\")
+          }
+          for ((v, rhs, _) <- odes)
+            out.println(
+              "    \\tfrac{d}{dt}" + v.toTex + " &= " + rhs.toTex + "\\\\")
+          out.println("  \\end{align*}")
+          out.println("\\end{document}")
+
+        case _ =>
+          for ((k, rhs) <- momentRhsTerms) {
+            out.println("x^" + k + " = " + rhs.mkString(" + "))
+          }
+          for ((v, rhs, _) <- odes) { out.println("d" + v + "/dt = " + rhs) }
+          out.println("where")
+          for ((v, _, g) <- odes) { out.println("  " + v + " = #" + g) }
+      }
+      out.flush
+      if (args.size > 2) out.close
+      println("Wrote " + odes.size + " ODEs to " + outFilename + ".")
     }
   }
 }
